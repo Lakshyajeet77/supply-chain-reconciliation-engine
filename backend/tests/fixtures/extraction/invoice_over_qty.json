@@ -1,0 +1,22 @@
+{
+  "document_type": "invoice",
+  "invoice_number": "INV-9002",
+  "supplier_name": "Acme Supplies Pvt Ltd",
+  "invoice_date": "2026-01-21",
+  "po_reference": "PO-1001",
+  "currency": "INR",
+  "line_items": [
+    {
+      "line_number": 1,
+      "description": "Logitech MX Wireless Mouse",
+      "sku": "LOG-MX-001",
+      "quantity": "12",
+      "unit_of_measure": "EA",
+      "unit_price": "2500.00",
+      "line_total": "30000.00"
+    }
+  ],
+  "subtotal": "30000.00",
+  "tax_total": "5400.00",
+  "total": "35400.00"
+}
