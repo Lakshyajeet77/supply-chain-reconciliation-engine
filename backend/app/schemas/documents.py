@@ -9,7 +9,7 @@ from app.schemas.common import DocumentProcessingStatus, DocumentType
 
 
 class DocumentRecord(BaseModel):
-    """In-memory document metadata for Milestone 0 (replaced by Postgres later)."""
+    """Document metadata persisted in PostgreSQL (API DTO)."""
 
     id: UUID
     document_type: DocumentType

@@ -11,17 +11,22 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Runtime settings. Secrets never belong in source control."""
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+    model_config = SettingsConfigDict(env_file="../.env", env_file_encoding="utf-8", extra="ignore")
 
     app_env: str = "development"
     app_name: str = "Supply-Chain Reconciliation Engine"
+    log_level: str = "INFO"
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-3.5-flash"
 
     upload_dir: Path = Path("./uploads")
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
+
+    # PostgreSQL in Compose/production; SQLite allowed for isolated tests only.
+    database_url: str = Field(
+        default="postgresql+psycopg://reconcile:reconcile@localhost:5432/reconcile",
+        description="SQLAlchemy database URL",
+    )
 
     money_decimal_places: int = Field(default=2, ge=0, le=6)
     price_tolerance: Decimal = Decimal("0.00")

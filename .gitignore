@@ -34,5 +34,6 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Docker / local data (future milestones)
+# Docker / local data
 postgres_data/
+.upload_data/

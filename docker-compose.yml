@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-reconcile}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reconcile}
+      POSTGRES_DB: ${POSTGRES_DB:-reconcile}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-reconcile} -d ${POSTGRES_DB:-reconcile}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_NAME: ${APP_NAME:-Supply-Chain Reconciliation Engine}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      UPLOAD_DIR: /data/uploads
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-10485760}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-reconcile}:${POSTGRES_PASSWORD:-reconcile}@db:5432/${POSTGRES_DB:-reconcile}
+      MONEY_DECIMAL_PLACES: ${MONEY_DECIMAL_PLACES:-2}
+      PRICE_TOLERANCE: ${PRICE_TOLERANCE:-0.00}
+      QUANTITY_TOLERANCE: ${QUANTITY_TOLERANCE:-0.000}
+    volumes:
+      - upload_data:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["./docker-entrypoint.sh"]
+
+volumes:
+  postgres_data:
+  upload_data:

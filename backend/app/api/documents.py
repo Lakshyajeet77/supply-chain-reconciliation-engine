@@ -5,8 +5,11 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
+from app.db.session import get_db
+from app.logging_config import get_logger
 from app.schemas.common import DocumentType
 from app.schemas.documents import (
     DocumentListResponse,
@@ -16,9 +19,14 @@ from app.schemas.documents import (
 )
 from app.services.ingestion.service import DuplicateDocumentError, IngestionService
 from app.services.ingestion.validation import InvalidUploadError
-from app.services.registry.memory import DocumentRegistry, get_registry
+from app.services.registry.store import DocumentRegistry, PersistenceError
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+logger = get_logger(__name__)
+
+
+def get_registry(db: Session = Depends(get_db)) -> DocumentRegistry:
+    return DocumentRegistry(db)
 
 
 def get_ingestion_service(
@@ -35,6 +43,7 @@ def get_ingestion_service(
     responses={
         409: {"model": DuplicateUploadResponse, "description": "Exact-file duplicate"},
         400: {"description": "Invalid upload"},
+        503: {"description": "Persistence unavailable"},
     },
 )
 async def upload_document(
@@ -68,6 +77,11 @@ async def upload_document(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"message": str(exc)},
+        ) from exc
+    except PersistenceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"message": "Document could not be persisted. Upload was not accepted."},
         ) from exc
 
     return UploadResponse(document=record, duplicate=False)
