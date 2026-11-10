@@ -1,0 +1,22 @@
+{
+  "document_type": "invoice",
+  "invoice_number": "INV-2026-201",
+  "supplier_name": "ABC Industries",
+  "invoice_date": "2026-10-05",
+  "po_reference": "PO-2026-101",
+  "currency": "INR",
+  "line_items": [
+    {
+      "line_number": 1,
+      "description": "Widget A",
+      "sku": "SKU-A",
+      "quantity": 100.000000,
+      "unit_of_measure": "pcs",
+      "unit_price": 10.0000,
+      "line_total": 1000.0000
+    }
+  ],
+  "subtotal": 1000.0000,
+  "tax_total": 180.0000,
+  "total": 1180.0000
+}

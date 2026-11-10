@@ -1,0 +1,10 @@
+Delivery Challan: DC-2026-302
+Supplier: XYZ Corp
+Date: 2026-10-04
+PO Reference: PO-2026-102
+Handwritten Note: Received 45 pcs
+
+Items:
+1. SKU: SKU-B, Description: Widget B, Quantity: 50 pcs, UOM: pcs
+
+Total Quantity: 50 pcs

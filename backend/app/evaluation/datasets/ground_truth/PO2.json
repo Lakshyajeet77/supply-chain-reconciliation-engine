@@ -1,0 +1,21 @@
+{
+  "document_type": "purchase_order",
+  "po_number": "PO-2026-102",
+  "supplier_name": "XYZ Corp",
+  "order_date": "2026-10-02",
+  "currency": "INR",
+  "line_items": [
+    {
+      "line_number": 1,
+      "description": "Widget B",
+      "sku": "SKU-B",
+      "quantity": 50.000000,
+      "unit_of_measure": "pcs",
+      "unit_price": 20.0000,
+      "line_total": 1000.0000
+    }
+  ],
+  "subtotal": 1000.0000,
+  "tax_total": 180.0000,
+  "total": 1180.0000
+}

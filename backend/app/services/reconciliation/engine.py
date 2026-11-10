@@ -1,5 +1,5 @@
 """
-Deterministic reconciliation engine.
+Deterministic reconciliation engine with intelligent matching.
 
 Independent of any LLM provider. Financial arithmetic uses Decimal only.
 An invoice alone can never produce MATCHED — a purchase order is required.
@@ -18,6 +18,8 @@ from app.schemas.reconciliation import (
     ReconciliationInput,
     ReconciliationResult,
 )
+from app.schemas.matching import MatchType, MatchingResult
+from app.services.matching.matcher import IntelligentMatcher
 from app.services.reconciliation.policies import ReconciliationPolicies
 
 
@@ -28,6 +30,7 @@ def reconcile(
     policies = policies or ReconciliationPolicies()
     discrepancies: list[Discrepancy] = []
     notes: list[str] = []
+    matching_metadata: dict = {}  # Will store match explanations per line
 
     # --- Required documents for MATCHED ---
     if payload.invoice is None:
@@ -71,17 +74,40 @@ def reconcile(
     discrepancies.extend(_check_critical_fields(po, invoice))
     discrepancies.extend(_check_currency(po, invoice))
     discrepancies.extend(_check_po_reference(po, invoice))
-    discrepancies.extend(_check_line_items(po, invoice, policies))
+
+    # --- Intelligent Matching Integration ---
+    matcher = IntelligentMatcher()
+
+    # Match Invoice lines to PO lines
+    inv_to_po_matches = matcher.match_line_items(invoice.line_items, po.line_items)
+
+    # Match Delivery lines to PO lines (if delivery provided)
+    delivery_to_po_matches = {}
+    if payload.delivery is not None:
+        delivery_to_po_matches = matcher.match_line_items(payload.delivery.line_items, po.line_items)
+
+    # Prepare matching details
+    matching_details = MatchingResult(
+        invoice_to_po=inv_to_po_matches,
+        delivery_to_po=delivery_to_po_matches
+    )
+
+    # Check line items using matched pairs
+    discrepancies.extend(
+        _check_line_items_matched(po, invoice, payload.delivery, inv_to_po_matches, delivery_to_po_matches, policies)
+    )
     discrepancies.extend(_check_invoice_totals(invoice, policies))
 
     if payload.delivery is not None:
         notes.append("Delivery record supplied; quantity compared against delivered amounts when SKUs align.")
-        discrepancies.extend(
-            _check_delivery_quantities(payload.delivery.line_items, invoice, policies)
-        )
 
     status = _resolve_status(discrepancies)
-    return ReconciliationResult(status=status, discrepancies=discrepancies, notes=notes)
+    return ReconciliationResult(
+        status=status,
+        discrepancies=discrepancies,
+        notes=notes,
+        matching_details=matching_details
+    )
 
 
 def _resolve_status(discrepancies: list[Discrepancy]) -> ReconciliationStatus:
@@ -199,61 +225,91 @@ def _check_po_reference(po: PurchaseOrderRecord, invoice: InvoiceRecord) -> list
     return []
 
 
-def _index_by_sku(items: list[ExtractedLineItem]) -> dict[str, ExtractedLineItem]:
-    indexed: dict[str, ExtractedLineItem] = {}
-    for item in items:
-        if item.sku:
-            indexed[item.sku.strip().upper()] = item
-    return indexed
-
-
-def _check_line_items(
+def _check_line_items_matched(
     po: PurchaseOrderRecord,
     invoice: InvoiceRecord,
+    delivery,
+    inv_to_po_matches: dict,
+    delivery_to_po_matches: dict,
     policies: ReconciliationPolicies,
 ) -> list[Discrepancy]:
+    """Check line items using intelligent matching results."""
     issues: list[Discrepancy] = []
-    po_by_sku = _index_by_sku(po.line_items)
 
-    for idx, inv_line in enumerate(invoice.line_items):
-        label = inv_line.sku or inv_line.description or f"line[{idx}]"
-        po_line = po_by_sku.get(inv_line.sku.strip().upper()) if inv_line.sku else None
+    # Build reverse lookup: PO index -> list of invoice indices that matched it
+    po_to_inv: dict[int, list[int]] = {}
+    for inv_idx, match in inv_to_po_matches.items():
+        # Find which PO line this matched to
+        # Since we match against target items list, we need to find the target index
+        # The matcher returns matches by source index, but we need to find target
+        pass  # We'll use the match object directly
 
-        if po_line is None:
-            # Milestone 0: SKU-based alignment only; unmatched lines need review.
+    for inv_idx, inv_line in enumerate(invoice.line_items):
+        match = inv_to_po_matches.get(inv_idx)
+
+        # Determine the matched PO line
+        matched_po_line = None
+        matched_po_idx = -1
+
+        if match and match.match_type != MatchType.UNMATCHED:
+            # Find which PO line was matched by comparing descriptions/SKU
+            # The matcher only returns the match result, not the target index
+            # For now, we find the best matching PO line using same logic
+            # In a more robust implementation, matcher would return target index
+            for po_idx, po_line in enumerate(po.line_items):
+                if match.match_type == MatchType.EXACT_SKU:
+                    from app.services.matching.normalization import normalize_sku
+                    if normalize_sku(po_line.sku) == normalize_sku(inv_line.sku):
+                        matched_po_line = po_line
+                        matched_po_idx = po_idx
+                        break
+                elif match.match_type == MatchType.FUZZY_DESCRIPTION:
+                    from app.services.matching.normalization import normalize_description
+                    if normalize_description(po_line.description) == normalize_description(match.explanation.split(": ")[-1].split(" (score")[0]):
+                        matched_po_line = po_line
+                        matched_po_idx = po_idx
+                        break
+
+        if matched_po_line is None:
+            # No match found - line item doesn't correspond to any PO line
+            label = inv_line.sku or inv_line.description or f"line[{inv_idx}]"
             issues.append(
                 Discrepancy(
                     discrepancy_type=DiscrepancyType.MISSING_CRITICAL_FIELD,
                     severity=DiscrepancySeverity.CRITICAL,
-                    field=f"invoice.line_items[{idx}]",
-                    expected="matching PO line by SKU",
+                    field=f"invoice.line_items[{inv_idx}]",
+                    expected="matching PO line",
                     observed=label,
-                    explanation="Invoice line could not be matched to a PO line by SKU.",
-                    recommended_action="Route to human review (fuzzy matching comes later).",
+                    explanation="Invoice line could not be matched to any PO line (SKU or fuzzy description).",
+                    recommended_action="Route to human review - unmatched product.",
                 )
             )
             continue
 
-        if inv_line.quantity is None or po_line.quantity is None:
+        # We have a matched PO line - now check financials
+        label = inv_line.sku or inv_line.description or f"line[{inv_idx}]"
+
+        # Check quantity
+        if inv_line.quantity is None or matched_po_line.quantity is None:
             issues.append(
                 Discrepancy(
                     discrepancy_type=DiscrepancyType.MISSING_CRITICAL_FIELD,
                     severity=DiscrepancySeverity.CRITICAL,
                     field=f"quantity:{label}",
-                    expected=str(po_line.quantity) if po_line.quantity is not None else None,
+                    expected=str(matched_po_line.quantity) if matched_po_line.quantity is not None else None,
                     observed=str(inv_line.quantity) if inv_line.quantity is not None else None,
                     explanation="Quantity missing on PO or invoice line.",
                     recommended_action="Send to human review.",
                 )
             )
-        elif not policies.within_quantity_tolerance(po_line.quantity, inv_line.quantity):
-            diff = inv_line.quantity - po_line.quantity
+        elif not policies.within_quantity_tolerance(matched_po_line.quantity, inv_line.quantity):
+            diff = inv_line.quantity - matched_po_line.quantity
             issues.append(
                 Discrepancy(
                     discrepancy_type=DiscrepancyType.QUANTITY_MISMATCH,
                     severity=DiscrepancySeverity.ERROR,
                     field=f"quantity:{label}",
-                    expected=str(po_line.quantity),
+                    expected=str(matched_po_line.quantity),
                     observed=str(inv_line.quantity),
                     difference=str(diff),
                     explanation="Invoiced quantity differs from ordered quantity beyond tolerance.",
@@ -261,26 +317,27 @@ def _check_line_items(
                 )
             )
 
-        if inv_line.unit_price is None or po_line.unit_price is None:
+        # Check unit price
+        if inv_line.unit_price is None or matched_po_line.unit_price is None:
             issues.append(
                 Discrepancy(
                     discrepancy_type=DiscrepancyType.MISSING_CRITICAL_FIELD,
                     severity=DiscrepancySeverity.CRITICAL,
                     field=f"unit_price:{label}",
-                    expected=str(po_line.unit_price) if po_line.unit_price is not None else None,
+                    expected=str(matched_po_line.unit_price) if matched_po_line.unit_price is not None else None,
                     observed=str(inv_line.unit_price) if inv_line.unit_price is not None else None,
                     explanation="Unit price missing on PO or invoice line.",
                     recommended_action="Send to human review.",
                 )
             )
-        elif not policies.within_price_tolerance(po_line.unit_price, inv_line.unit_price):
-            diff = policies.round_money(inv_line.unit_price - po_line.unit_price)
+        elif not policies.within_price_tolerance(matched_po_line.unit_price, inv_line.unit_price):
+            diff = policies.round_money(inv_line.unit_price - matched_po_line.unit_price)
             issues.append(
                 Discrepancy(
                     discrepancy_type=DiscrepancyType.PRICE_MISMATCH,
                     severity=DiscrepancySeverity.ERROR,
                     field=f"unit_price:{label}",
-                    expected=str(policies.round_money(po_line.unit_price)),
+                    expected=str(policies.round_money(matched_po_line.unit_price)),
                     observed=str(policies.round_money(inv_line.unit_price)),
                     difference=str(diff),
                     explanation="Invoice unit price exceeds or differs from approved PO price.",
@@ -288,6 +345,7 @@ def _check_line_items(
                 )
             )
 
+        # Check line arithmetic
         if (
             inv_line.quantity is not None
             and inv_line.unit_price is not None
@@ -309,39 +367,96 @@ def _check_line_items(
                     )
                 )
 
+    # Check delivery quantities against invoice using matched PO lines as bridge
+    if delivery is not None:
+        issues.extend(
+            _check_delivery_quantities_matched(delivery.line_items, invoice.line_items, po.line_items,
+                                             delivery_to_po_matches, inv_to_po_matches, policies)
+        )
+
     return issues
 
 
-def _check_delivery_quantities(
+def _check_delivery_quantities_matched(
     delivery_lines: list[ExtractedLineItem],
-    invoice: InvoiceRecord,
+    invoice_lines: list[ExtractedLineItem],
+    po_lines: list[ExtractedLineItem],
+    delivery_to_po_matches: dict,
+    inv_to_po_matches: dict,
     policies: ReconciliationPolicies,
 ) -> list[Discrepancy]:
+    """Check delivery quantities against invoice using PO as reference bridge."""
     issues: list[Discrepancy] = []
-    delivery_by_sku = _index_by_sku(delivery_lines)
 
-    for idx, inv_line in enumerate(invoice.line_items):
-        if not inv_line.sku or inv_line.quantity is None:
-            continue
-        key = inv_line.sku.strip().upper()
-        delivered = delivery_by_sku.get(key)
-        if delivered is None or delivered.quantity is None:
-            continue
-        if not policies.within_quantity_tolerance(delivered.quantity, inv_line.quantity):
-            # Invoiced more than delivered is a concrete exception.
-            if inv_line.quantity > delivered.quantity:
-                issues.append(
-                    Discrepancy(
-                        discrepancy_type=DiscrepancyType.QUANTITY_MISMATCH,
-                        severity=DiscrepancySeverity.ERROR,
-                        field=f"delivered_vs_invoiced:{key}",
-                        expected=str(delivered.quantity),
-                        observed=str(inv_line.quantity),
-                        difference=str(inv_line.quantity - delivered.quantity),
-                        explanation="Invoiced quantity exceeds delivered quantity.",
-                        recommended_action="Flag over-billing relative to delivery.",
+    # For each delivery line, find its matched PO line
+    # Then find which invoice line matched the same PO line
+    po_idx_to_delivery: dict[int, list[int]] = {}
+    for del_idx, match in delivery_to_po_matches.items():
+        if match.match_type != MatchType.UNMATCHED:
+            # Find PO index
+            for po_idx, po_line in enumerate(po_lines):
+                if match.match_type == MatchType.EXACT_SKU:
+                    from app.services.matching.normalization import normalize_sku
+                    if normalize_sku(po_line.sku) == normalize_sku(delivery_lines[del_idx].sku):
+                        po_idx_to_delivery.setdefault(po_idx, []).append(del_idx)
+                        break
+                elif match.match_type == MatchType.FUZZY_DESCRIPTION:
+                    from app.services.matching.normalization import normalize_description
+                    if normalize_description(po_line.description) == normalize_description(match.explanation.split(": ")[-1].split(" (score")[0]):
+                        po_idx_to_delivery.setdefault(po_idx, []).append(del_idx)
+                        break
+
+    po_idx_to_invoice: dict[int, list[int]] = {}
+    for inv_idx, match in inv_to_po_matches.items():
+        if match.match_type != MatchType.UNMATCHED:
+            for po_idx, po_line in enumerate(po_lines):
+                if match.match_type == MatchType.EXACT_SKU:
+                    from app.services.matching.normalization import normalize_sku
+                    if normalize_sku(po_line.sku) == normalize_sku(invoice_lines[inv_idx].sku):
+                        po_idx_to_invoice.setdefault(po_idx, []).append(inv_idx)
+                        break
+                elif match.match_type == MatchType.FUZZY_DESCRIPTION:
+                    from app.services.matching.normalization import normalize_description
+                    if normalize_description(po_line.description) == normalize_description(match.explanation.split(": ")[-1].split(" (score")[0]):
+                        po_idx_to_invoice.setdefault(po_idx, []).append(inv_idx)
+                        break
+
+    # Now compare delivery vs invoice for each PO line
+    for po_idx, del_indices in po_idx_to_delivery.items():
+        inv_indices = po_idx_to_invoice.get(po_idx, [])
+        if not inv_indices:
+            continue  # No invoice line for this PO line
+
+        # Sum delivery quantities
+        total_delivered = sum(
+            delivery_lines[i].quantity for i in del_indices
+            if delivery_lines[i].quantity is not None
+        )
+
+        # Sum invoiced quantities
+        total_invoiced = sum(
+            invoice_lines[i].quantity for i in inv_indices
+            if invoice_lines[i].quantity is not None
+        )
+
+        if total_delivered > 0 and total_invoiced > 0:
+            if not policies.within_quantity_tolerance(total_delivered, total_invoiced):
+                if total_invoiced > total_delivered:
+                    po_line = po_lines[po_idx]
+                    label = po_line.sku or po_line.description or f"line[{po_idx}]"
+                    issues.append(
+                        Discrepancy(
+                            discrepancy_type=DiscrepancyType.QUANTITY_MISMATCH,
+                            severity=DiscrepancySeverity.ERROR,
+                            field=f"delivered_vs_invoiced:{label}",
+                            expected=str(total_delivered),
+                            observed=str(total_invoiced),
+                            difference=str(total_invoiced - total_delivered),
+                            explanation="Invoiced quantity exceeds delivered quantity.",
+                            recommended_action="Flag over-billing relative to delivery.",
+                        )
                     )
-                )
+
     return issues
 
 

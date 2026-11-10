@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.common import ReconciliationStatus
 from app.schemas.extraction import DeliveryRecord, InvoiceRecord, PurchaseOrderRecord
+from app.schemas.matching import MatchingResult
 
 
 class DiscrepancyType(str, Enum):
@@ -54,6 +55,8 @@ class ReconciliationResult(BaseModel):
     status: ReconciliationStatus
     discrepancies: list[Discrepancy] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+    matching_details: MatchingResult | None = None
+    matching_details: MatchingResult | None = None
 
     @property
     def is_matched(self) -> bool:

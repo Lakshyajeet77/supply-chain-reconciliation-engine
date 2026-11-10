@@ -1,0 +1,12 @@
+Invoice: INV-2026-202
+Supplier: XYZ Corp
+Date: 2026-10-06
+PO Reference: PO-2026-102
+Currency: INR
+
+Items:
+1. SKU: SKU-B, Description: Widget B, Quantity: 50 pcs, Price: 20.00, Total: 1000.00
+
+Subtotal: 1000.00
+Tax: 180.00
+Total: 1180.00

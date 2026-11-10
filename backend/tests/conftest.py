@@ -35,6 +35,7 @@ def _isolate_db_and_uploads(tmp_path, monkeypatch):
     monkeypatch.setenv("MAX_UPLOAD_BYTES", "10485760")
     monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{db_path.as_posix()}")
     monkeypatch.setenv("LOG_LEVEL", "WARNING")
+    monkeypatch.setenv("EXTRACTION_PROVIDER_MODE", "fixture")
 
     get_settings.cache_clear()
     reset_db_state()

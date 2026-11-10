@@ -17,6 +17,7 @@ class ExtractionResult:
     document_type: DocumentType
     data: ExtractedDocument
     source_fixture_id: str | None = None
+    provider_metadata: dict[str, str | int | float | None] | None = None
 
 
 class ExtractionProvider(Protocol):

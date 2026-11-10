@@ -1,0 +1,18 @@
+{
+  "document_type": "delivery",
+  "delivery_number": "DC-2026-301",
+  "supplier_name": "ABC Industries",
+  "delivery_date": "2026-10-03",
+  "po_reference": "PO-2026-101",
+  "line_items": [
+    {
+      "line_number": 1,
+      "description": "Widget A",
+      "sku": "SKU-A",
+      "quantity": 100.000000,
+      "unit_of_measure": "pcs",
+      "unit_price": null,
+      "line_total": null
+    }
+  ]
+}

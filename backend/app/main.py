@@ -4,10 +4,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.api import documents, health, reconciliation
+from app.api import documents, health, reconciliation, reviews, reconciliation_approved, document_relationships
 from app.config import get_settings
 from app.db.session import get_engine
 from app.logging_config import configure_logging, get_logger
@@ -69,6 +70,19 @@ def create_app() -> FastAPI:
     application.include_router(health.router)
     application.include_router(documents.router)
     application.include_router(reconciliation.router)
+    application.include_router(reviews.router)
+    application.include_router(reconciliation_approved.router)
+    application.include_router(document_relationships.router)
+
+    # Local MVP has no authentication; restrict CORS to the configured dev origins.
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type"],
+    )
+
     return application
 
 

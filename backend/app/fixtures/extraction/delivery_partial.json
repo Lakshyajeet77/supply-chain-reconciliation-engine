@@ -1,0 +1,16 @@
+{
+  "document_type": "delivery",
+  "delivery_number": "DC-5002",
+  "po_reference": "PO-1001",
+  "supplier_name": "Acme Supplies Pvt Ltd",
+  "delivery_date": "2026-01-16",
+  "line_items": [
+    {
+      "line_number": 1,
+      "description": "Logitech MX Wireless Mouse",
+      "sku": "LOG-MX-001",
+      "quantity": "8",
+      "unit_of_measure": "EA"
+    }
+  ]
+}

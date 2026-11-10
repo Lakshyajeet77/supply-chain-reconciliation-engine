@@ -1,0 +1,9 @@
+Delivery Challan: DC-2026-301
+Supplier: ABC Industries
+Date: 2026-10-03
+PO Reference: PO-2026-101
+
+Items:
+1. SKU: SKU-A, Description: Widget A, Quantity: 100 pcs, UOM: pcs
+
+Total Quantity: 100 pcs

@@ -179,3 +179,46 @@ def test_reconciliation_api_invoice_alone(client, extraction_provider):
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "needs_human_review"
+
+
+def test_reconciliation_api_three_documents(client, extraction_provider):
+    """Test full three-document workflow: PO + Delivery + Invoice."""
+    po = _load(extraction_provider, DocumentType.PURCHASE_ORDER, "po_matched")
+    delivery = _load(extraction_provider, DocumentType.DELIVERY, "delivery_matched")
+    inv = _load(extraction_provider, DocumentType.INVOICE, "invoice_matched")
+    response = client.post(
+        "/reconciliation/run",
+        json={
+            "purchase_order": po.model_dump(mode="json"),
+            "delivery": delivery.model_dump(mode="json"),
+            "invoice": inv.model_dump(mode="json"),
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "matched"
+    assert body["discrepancies"] == []
+    assert "Delivery record supplied" in body["notes"][0]
+
+
+def test_reconciliation_api_partial_delivery(client, extraction_provider):
+    """Test PO + partial delivery + invoice - should flag over-invoicing."""
+    po = _load(extraction_provider, DocumentType.PURCHASE_ORDER, "po_matched")
+    delivery = _load(extraction_provider, DocumentType.DELIVERY, "delivery_partial")
+    inv = _load(extraction_provider, DocumentType.INVOICE, "invoice_matched")
+    response = client.post(
+        "/reconciliation/run",
+        json={
+            "purchase_order": po.model_dump(mode="json"),
+            "delivery": delivery.model_dump(mode="json"),
+            "invoice": inv.model_dump(mode="json"),
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "flagged"
+    # Should have quantity mismatch for delivered vs invoiced
+    assert any(
+        d["discrepancy_type"] == "quantity_mismatch" and "delivered_vs_invoiced" in d["field"]
+        for d in body["discrepancies"]
+    )

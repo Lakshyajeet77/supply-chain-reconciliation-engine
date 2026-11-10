@@ -1,0 +1,11 @@
+Purchase Order: PO-2026-101
+Supplier: ABC Industries
+Date: 2026-10-01
+Currency: INR
+
+Items:
+1. SKU: SKU-A, Description: Widget A, Quantity: 100 pcs, Price: 10.00, Total: 1000.00
+
+Subtotal: 1000.00
+Tax: 180.00
+Total: 1180.00

@@ -22,6 +22,7 @@ class DocumentRecord(BaseModel):
     uploaded_at: datetime
     extraction_fixture_id: str | None = None
     failure_reason: str | None = None
+    extracted_data: dict | None = None
 
 
 class UploadResponse(BaseModel):

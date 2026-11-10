@@ -5,7 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint, JSON
+
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import Uuid
 
@@ -27,3 +28,4 @@ class Document(Base):
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     extraction_fixture_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    extracted_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)

@@ -1,0 +1,19 @@
+{
+  "document_type": "delivery",
+  "delivery_number": "DC-2026-302",
+  "supplier_name": "XYZ Corp",
+  "delivery_date": "2026-10-04",
+  "po_reference": "PO-2026-102",
+  "line_items": [
+    {
+      "line_number": 1,
+      "description": "Widget B",
+      "sku": "SKU-B",
+      "quantity": 45.000000,
+      "unit_of_measure": "pcs",
+      "unit_price": null,
+      "line_total": null
+    }
+  ],
+  "handwritten_note": "Received 45 pcs"
+}

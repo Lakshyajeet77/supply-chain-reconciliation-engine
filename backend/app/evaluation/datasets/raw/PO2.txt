@@ -1,0 +1,11 @@
+Purchase Order: PO-2026-102
+Supplier: XYZ Corp
+Date: 2026-10-02
+Currency: INR
+
+Items:
+1. SKU: SKU-B, Description: Widget B, Quantity: 50 pcs, Price: 20.00, Total: 1000.00
+
+Subtotal: 1000.00
+Tax: 180.00
+Total: 1180.00

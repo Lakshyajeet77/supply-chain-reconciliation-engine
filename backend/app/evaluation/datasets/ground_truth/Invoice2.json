@@ -1,0 +1,22 @@
+{
+  "document_type": "invoice",
+  "invoice_number": "INV-2026-202",
+  "supplier_name": "XYZ Corp",
+  "invoice_date": "2026-10-06",
+  "po_reference": "PO-2026-102",
+  "currency": "INR",
+  "line_items": [
+    {
+      "line_number": 1,
+      "description": "Widget B",
+      "sku": "SKU-B",
+      "quantity": 50.000000,
+      "unit_of_measure": "pcs",
+      "unit_price": 20.0000,
+      "line_total": 1000.0000
+    }
+  ],
+  "subtotal": 1000.0000,
+  "tax_total": 180.0000,
+  "total": 1180.0000
+}
